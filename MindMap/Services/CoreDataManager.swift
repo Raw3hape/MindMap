@@ -9,17 +9,30 @@ import CoreData
 import Foundation
 
 // MARK: - Core Data Manager
-class CoreDataManager: ObservableObject {
+@MainActor
+class CoreDataManager: ObservableObject, @unchecked Sendable {
     static let shared = CoreDataManager()
     
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "MindMap")
+        
+        // Оптимизация производительности
+        let storeDescription = container.persistentStoreDescriptions.first
+        storeDescription?.shouldMigrateStoreAutomatically = true
+        storeDescription?.shouldInferMappingModelAutomatically = true
+        
         container.loadPersistentStores { _, error in
             if let error = error as NSError? {
-                print("Core Data ошибка: \(error), \(error.userInfo)")
+                logError("💾 Core Data ошибка загрузки: \(error.localizedDescription)", category: .data)
+            } else {
+                logInfo("💾 Core Data успешно инициализирован", category: .data)
             }
         }
+        
+        // Оптимизация контекста
         container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        
         return container
     }()
     
@@ -34,8 +47,9 @@ class CoreDataManager: ObservableObject {
         if context.hasChanges {
             do {
                 try context.save()
+                logDebug("💾 Изменения сохранены в Core Data", category: .data)
             } catch {
-                print("Ошибка сохранения: \(error)")
+                logError("💾 Ошибка сохранения в Core Data: \(error.localizedDescription)", category: .data)
             }
         }
     }

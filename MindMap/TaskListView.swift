@@ -1,6 +1,6 @@
 //
 //  TaskListView.swift
-//  MindMap
+//  MindMap - Минималистичная версия
 //
 //  Created by Nikita Sergyshkin on 05/08/2025.
 //
@@ -11,24 +11,22 @@ struct TaskListView: View {
     @StateObject private var viewModel = TaskViewModel()
     @State private var showingRecordingView = false
     @State private var selectedTask: Task?
-    @State private var showingTaskDetail = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                AppColors.background
+                Color.minimalBackground
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Поиск и фильтры
-                    searchAndFilterSection
+                    // Простой заголовок с количеством
+                    MinimalSectionHeader(
+                        title: viewModel.showCompleted ? "Выполнено" : "Задачи",
+                        count: filteredTasks.count
+                    )
+                    .padding(.top, 8)
                     
-                    // Статистика
-                    if !viewModel.tasks.isEmpty || !viewModel.completedTasks.isEmpty {
-                        statisticsSection
-                    }
-                    
-                    // Список задач
+                    // Основной контент
                     if viewModel.isLoading {
                         loadingView
                     } else if filteredTasks.isEmpty {
@@ -38,37 +36,13 @@ struct TaskListView: View {
                     }
                 }
             }
-            .navigationTitle("Задачи")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingRecordingView = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(AppColors.primary)
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { viewModel.showCompleted.toggle() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: viewModel.showCompleted ? "checkmark.circle.fill" : "list.bullet")
-                            Text(viewModel.showCompleted ? "Активные" : "Выполненные")
-                        }
-                        .font(.caption)
-                        .foregroundColor(AppColors.primary)
-                    }
-                }
-            }
-            .refreshable {
-                viewModel.refreshTasks()
-            }
+            .navigationBarHidden(true)
         }
         .sheet(isPresented: $showingRecordingView) {
-            RecordingView()
+            MinimalRecordingView()
         }
         .sheet(item: $selectedTask) { task in
-            TaskDetailView(task: task) { updatedTask in
+            MinimalTaskDetailView(task: task) { updatedTask in
                 viewModel.updateTask(updatedTask)
             }
         }
@@ -78,347 +52,122 @@ struct TaskListView: View {
             Text(viewModel.errorMessage ?? "Произошла неизвестная ошибка")
         }
         .onAppear {
-            viewModel.loadTasks()
+            if viewModel.tasks.isEmpty && viewModel.completedTasks.isEmpty {
+                viewModel.loadTasks()
+            }
         }
+        .overlay(
+            // Плавающие кнопки внизу экрана
+            VStack {
+                Spacer()
+                floatingButtons
+            }
+            .ignoresSafeArea(.keyboard)
+        )
     }
     
     // MARK: - Computed Properties
     private var filteredTasks: [Task] {
-        viewModel.showCompleted ? viewModel.completedTasks : viewModel.tasks.filter { !$0.isCompleted }
-    }
-    
-    // MARK: - Search and Filter Section
-    private var searchAndFilterSection: some View {
-        VStack(spacing: 12) {
-            // Поисковая строка
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppColors.textSecondary)
-                
-                TextField("Поиск задач...", text: $viewModel.searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .foregroundColor(AppColors.text)
-                
-                if !viewModel.searchText.isEmpty {
-                    Button(action: { viewModel.searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(AppColors.surface)
-            .cornerRadius(12)
-            
-            // Фильтры по приоритету
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(TaskFilter.allCases) { filter in
-                        FilterChip(
-                            title: filter.displayName,
-                            icon: filter.icon,
-                            isSelected: viewModel.selectedFilter == filter
-                        ) {
-                            viewModel.selectedFilter = filter
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
+        let baseTasks = viewModel.showCompleted ? viewModel.completedTasks : viewModel.tasks.filter { !$0.isCompleted }
+        
+        // Простая фильтрация по тексту поиска (если добавим позже)
+        if viewModel.searchText.isEmpty {
+            return baseTasks
+        } else {
+            return baseTasks.filter { task in
+                task.title.localizedCaseInsensitiveContains(viewModel.searchText) ||
+                (task.description?.localizedCaseInsensitiveContains(viewModel.searchText) ?? false)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-    
-    // MARK: - Statistics Section
-    private var statisticsSection: some View {
-        HStack(spacing: 20) {
-            StatisticCard(
-                title: "Всего",
-                value: "\(viewModel.totalTasks)",
-                icon: "list.bullet",
-                color: AppColors.info
-            )
-            
-            StatisticCard(
-                title: "Выполнено",
-                value: "\(viewModel.completedTasksCount)",
-                icon: "checkmark.circle",
-                color: AppColors.success
-            )
-            
-            StatisticCard(
-                title: "Активных",
-                value: "\(viewModel.pendingTasksCount)",
-                icon: "clock",
-                color: AppColors.warning
-            )
-            
-            StatisticCard(
-                title: "Прогресс",
-                value: "\(Int(viewModel.completionPercentage))%",
-                icon: "chart.line.uptrend.xyaxis",
-                color: AppColors.primary
-            )
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 16)
     }
     
     // MARK: - Task List Section
     private var taskListSection: some View {
-        List {
-            ForEach(filteredTasks) { task in
-                TaskRowView(
-                    task: task,
-                    onToggleCompletion: { viewModel.toggleTaskCompletion(task) },
-                    onToggleSubtask: { subtask in
-                        viewModel.toggleSubtaskCompletion(subtask, in: task)
-                    },
-                    onTap: { selectedTask = task }
-                )
-                .listRowBackground(AppColors.surface)
-                .listRowSeparator(.hidden)
-                .padding(.vertical, 4)
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(filteredTasks) { task in
+                    MinimalTaskCard(
+                        task: task,
+                        onToggle: { viewModel.toggleTaskCompletion(task) },
+                        onTap: { selectedTask = task }
+                    )
+                }
+                
+                // Отступ снизу для плавающих кнопок
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(height: 120)
             }
-            .onDelete(perform: deleteTasks)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
-        .listStyle(PlainListStyle())
-        .background(AppColors.background)
+        .background(Color.minimalBackground)
     }
     
     // MARK: - Loading View
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             ProgressView()
-                .scaleEffect(1.2)
-                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.primary))
+                .scaleEffect(1.5)
+                .progressViewStyle(CircularProgressViewStyle(tint: .minimalAccent))
             
-            Text("Загружаем задачи...")
-                .font(.body)
-                .foregroundColor(AppColors.textSecondary)
+            Text("Загружаем...")
+                .font(.system(size: 17))
+                .foregroundColor(.minimalTextSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Empty State View
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: viewModel.showCompleted ? "checkmark.circle" : "list.bullet")
-                .font(.system(size: 60))
-                .foregroundColor(AppColors.textTertiary)
+        MinimalEmptyState(
+            icon: viewModel.showCompleted ? "checkmark.circle" : "list.clipboard",
+            title: viewModel.showCompleted ? "Пока пусто" : "Начнем?",
+            subtitle: viewModel.showCompleted ? 
+                "Выполненные задачи появятся здесь" : 
+                "Создайте первую задачу голосом или текстом",
+            buttonTitle: viewModel.showCompleted ? nil : "Создать задачу",
+            buttonAction: viewModel.showCompleted ? nil : { showingRecordingView = true }
+        )
+    }
+    
+    // MARK: - Floating Buttons
+    private var floatingButtons: some View {
+        HStack(spacing: 16) {
+            // Переключатель активные/выполненные
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    viewModel.showCompleted.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: viewModel.showCompleted ? "list.bullet" : "checkmark.circle")
+                        .font(.system(size: 16, weight: .medium))
+                    Text(viewModel.showCompleted ? "Активные" : "Готово")
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .foregroundColor(.minimalTextPrimary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(.ultraThinMaterial)
+                .cornerRadius(25)
+            }
             
-            Text(viewModel.showCompleted ? "Нет выполненных задач" : "Нет активных задач")
-                .font(.title2)
-                .fontWeight(.medium)
-                .foregroundColor(AppColors.text)
+            Spacer()
             
-            Text(viewModel.showCompleted ? 
-                 "Выполненные задачи появятся здесь" : 
-                 "Создайте первую задачу, нажав кнопку +")
-                .font(.body)
-                .foregroundColor(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-            
-            if !viewModel.showCompleted {
-                Button(action: { showingRecordingView = true }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Создать задачу")
-                    }
-                    .font(.headline)
+            // Кнопка создания задачи
+            Button(action: { showingRecordingView = true }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(AppColors.primary)
-                    .cornerRadius(25)
-                }
-                .padding(.top, 10)
+                    .frame(width: 56, height: 56)
+                    .background(Color.minimalAccent)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 40)
-    }
-    
-    // MARK: - Actions
-    private func deleteTasks(offsets: IndexSet) {
-        withAnimation(.easeOut(duration: 0.3)) {
-            for index in offsets {
-                let task = filteredTasks[index]
-                viewModel.deleteTask(task)
-            }
-        }
-    }
-}
-
-// MARK: - Filter Chip View
-struct FilterChip: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.caption)
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-            .foregroundColor(isSelected ? .white : AppColors.text)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(isSelected ? AppColors.primary : AppColors.surface)
-                    .stroke(isSelected ? Color.clear : AppColors.border, lineWidth: 1)
-            )
-        }
-        .scaleEffect(isSelected ? 1.05 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
-    }
-}
-
-// MARK: - Statistic Card View
-struct StatisticCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(AppColors.text)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(AppColors.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(AppColors.surface)
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Task Detail View
-struct TaskDetailView: View {
-    let task: Task
-    let onUpdate: (Task) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var editedTask: Task
-    
-    init(task: Task, onUpdate: @escaping (Task) -> Void) {
-        self.task = task
-        self.onUpdate = onUpdate
-        self._editedTask = State(initialValue: task)
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Заголовок и описание
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Заголовок")
-                            .font(.headline)
-                            .foregroundColor(AppColors.text)
-                        
-                        TextField("Заголовок задачи", text: $editedTask.title)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                        if let description = editedTask.description {
-                            Text("Описание")
-                                .font(.headline)
-                                .foregroundColor(AppColors.text)
-                            
-                            Text(description)
-                                .font(.body)
-                                .foregroundColor(AppColors.textSecondary)
-                                .padding()
-                                .background(AppColors.surface)
-                                .cornerRadius(8)
-                        }
-                    }
-                    
-                    // Подзадачи
-                    if !editedTask.subtasks.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Подзадачи")
-                                .font(.headline)
-                                .foregroundColor(AppColors.text)
-                            
-                            ForEach(editedTask.subtasks) { subtask in
-                                HStack {
-                                    Button(action: { toggleSubtask(subtask) }) {
-                                        Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(subtask.isCompleted ? AppColors.success : AppColors.textSecondary)
-                                    }
-                                    
-                                    Text(subtask.title)
-                                        .font(.body)
-                                        .foregroundColor(AppColors.text)
-                                        .strikethrough(subtask.isCompleted)
-                                    
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                    
-                    // Приоритет
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Приоритет")
-                            .font(.headline)
-                            .foregroundColor(AppColors.text)
-                        
-                        Picker("Приоритет", selection: $editedTask.priority) {
-                            ForEach(TaskPriority.allCases, id: \.self) { priority in
-                                Text(priority.displayName).tag(priority)
-                            }
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                    }
-                    
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("Детали задачи")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Отмена") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Сохранить") {
-                        onUpdate(editedTask)
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func toggleSubtask(_ subtask: Subtask) {
-        if let index = editedTask.subtasks.firstIndex(where: { $0.id == subtask.id }) {
-            editedTask.subtasks[index].isCompleted.toggle()
-            editedTask.subtasks[index].completedAt = editedTask.subtasks[index].isCompleted ? Date() : nil
-        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 }
 

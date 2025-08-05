@@ -10,9 +10,9 @@ import SwiftUI
 // MARK: - App Colors
 struct AppColors {
     // MARK: - Primary Colors
-    static let primary = Color("Primary")
+    static let primary = Color("AppPrimary")
     static let secondary = Color.blue
-    static let accent = Color("Primary")
+    static let accent = Color("AppPrimary")
     
     // MARK: - Background Colors
     static let background = Color("Background")

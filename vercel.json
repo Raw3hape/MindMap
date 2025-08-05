@@ -1,19 +1,40 @@
 {
   "version": 2,
   "functions": {
-    "api/process-audio.js": {
-      "maxDuration": 30
-    },
     "api/process-text.js": {
-      "maxDuration": 15
+      "maxDuration": 10
+    },
+    "api/process-audio.js": {
+      "maxDuration": 5
     }
   },
-  "env": {
-    "OPENAI_API_KEY": "@openai-api-key"
-  },
-  "build": {
-    "env": {
-      "OPENAI_API_KEY": "@openai-api-key"
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
     }
-  }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.html"
+    }
+  ]
 }

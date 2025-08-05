@@ -14,9 +14,14 @@ struct PersistenceController {
     static let preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
-        for _ in 0..<10 {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
+        for i in 0..<3 {
+            let newTask = TaskEntity(context: viewContext)
+            newTask.id = UUID()
+            newTask.title = "Пример задачи \(i + 1)"
+            newTask.taskDescription = "Описание задачи \(i + 1)"
+            newTask.priority = Int16(i % 3 + 1) // 1=low, 2=medium, 3=high
+            newTask.isCompleted = false
+            newTask.createdAt = Date()
         }
         do {
             try viewContext.save()

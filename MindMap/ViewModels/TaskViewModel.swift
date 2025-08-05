@@ -26,6 +26,8 @@ class TaskViewModel: ObservableObject {
     
     init() {
         setupBindings()
+        setupCoreDataObserver()
+        // Загружаем данные асинхронно, не блокируя UI
         loadTasks()
     }
     
@@ -39,20 +41,34 @@ class TaskViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
+    private func setupCoreDataObserver() {
+        // Подписываемся на уведомления об изменениях в Core Data
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                print("🔄 Core Data изменился, перезагружаем задачи")
+                self?.loadTasks()
+            }
+            .store(in: &cancellables)
+    }
+    
     // MARK: - Data Loading
     func loadTasks() {
-        isLoading = true
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let allTasks = self?.coreDataManager.fetchTasks() ?? []
-            let completed = self?.coreDataManager.fetchCompletedTasks() ?? []
+        _Concurrency.Task { @MainActor in
+            isLoading = true
             
-            DispatchQueue.main.async {
-                self?.tasks = allTasks
-                self?.completedTasks = completed
-                self?.isLoading = false
-                self?.filterTasks()
-            }
+            let allTasks = await _Concurrency.Task.detached { [coreDataManager] in
+                return await coreDataManager.fetchTasks()
+            }.value
+            
+            let completed = await _Concurrency.Task.detached { [coreDataManager] in
+                return await coreDataManager.fetchCompletedTasks()
+            }.value
+            
+            tasks = allTasks
+            completedTasks = completed
+            isLoading = false
+            filterTasks()
         }
     }
     

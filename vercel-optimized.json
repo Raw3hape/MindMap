@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "functions": {
+    "api/process-audio.js": {
+      "maxDuration": 25,
+      "memory": 1024,
+      "regions": ["iad1"]
+    },
+    "api/process-text.js": {
+      "maxDuration": 10,
+      "memory": 512,
+      "regions": ["iad1"]
+    }
+  },
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key",
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "OPENAI_API_KEY": "@openai-api-key"
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods", 
+          "value": "GET, POST, OPTIONS"
+        }
+      ]
+    }
+  ]
+}

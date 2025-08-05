@@ -11,6 +11,7 @@ struct RecordingView: View {
     @StateObject private var viewModel = RecordingViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showingProcessingAlert = false
+    @State private var showingSettings = false
     
     var body: some View {
         NavigationView {
@@ -44,14 +45,20 @@ struct RecordingView: View {
             }
             .navigationTitle("Новая задача")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Отмена") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppColors.text)
+            .navigationBarBackButtonHidden(true)
+            .navigationBarItems(
+                leading: Button("Отмена") {
+                    dismiss()
                 }
-            }
+                .foregroundColor(AppColors.text),
+                
+                trailing: Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(AppColors.text)
+                }
+            )
         }
         .alert("Ошибка", isPresented: $viewModel.showError) {
             Button("OK") { }
@@ -63,12 +70,15 @@ struct RecordingView: View {
         } message: {
             Text("Обрабатываем вашу задачу...")
         }
-        .onChange(of: viewModel.isProcessing) { isProcessing in
+        .onChange(of: viewModel.isProcessing) { _, isProcessing in
             showingProcessingAlert = isProcessing
             if !isProcessing && !viewModel.showError {
                 // Если обработка завершилась успешно, закрываем экран
                 dismiss()
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            ProcessingModeSettingsView()
         }
     }
     
@@ -88,6 +98,21 @@ struct RecordingView: View {
                 .font(.body)
                 .foregroundColor(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
+            
+            // Индикатор режима обработки
+            HStack(spacing: 8) {
+                Image(systemName: processingModeIcon)
+                    .foregroundColor(.blue)
+                Text(viewModel.processingModeDescription)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.regularMaterial)
+            )
         }
     }
     
@@ -302,12 +327,22 @@ struct RecordingView: View {
     
     // MARK: - Actions
     private func processTask() {
-        Task {
+        _Concurrency.Task { @MainActor in
             if viewModel.hasRecording {
                 await viewModel.processRecording()
             } else if viewModel.hasManualText {
                 await viewModel.processManualText()
             }
+        }
+    }
+    
+    // MARK: - Processing Mode Icon
+    private var processingModeIcon: String {
+        switch viewModel.processingMode {
+        case .speechOnly:
+            return "iphone"
+        case .auto:
+            return "cpu"
         }
     }
 }
