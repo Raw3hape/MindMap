@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "functions": {
+    "api/process-audio.js": {
+      "maxDuration": 30
+    },
+    "api/process-text.js": {
+      "maxDuration": 15
+    }
+  },
+  "env": {
+    "OPENAI_API_KEY": "@openai-api-key"
+  },
+  "build": {
+    "env": {
+      "OPENAI_API_KEY": "@openai-api-key"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "mindmap-api",
+  "version": "1.0.0",
+  "description": "API для обработки аудио и текста через OpenAI",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Сборка завершена'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "openai": "^3.3.0",
+    "form-data": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "openai",
+    "whisper",
+    "gpt",
+    "api",
+    "mindmap"
+  ],
+  "author": "Nikita Sergyshkin",
+  "license": "MIT"
+}
